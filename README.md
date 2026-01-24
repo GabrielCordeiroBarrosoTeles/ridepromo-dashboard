@@ -14,6 +14,8 @@ Edite `.env.local` e preencha:
 - `NEXT_PUBLIC_SUPABASE_URL` – URL do projeto Supabase (já no exemplo).
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` ou `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` – chave anon/publishable do Supabase (Dashboard > Settings > API). Use a **anon** (JWT) se `sb_publishable_*` não funcionar.
 
+**Viagens (contagem única):** Para o card "Viagens" mostrar origem+destino+dia únicos (e não a soma de registros duplicados), execute no Supabase → SQL Editor o script `scripts/supabase_get_dashboard_stats.sql`.
+
 ## Desenvolvimento
 
 ```bash

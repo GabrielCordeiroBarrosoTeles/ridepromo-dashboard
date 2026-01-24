@@ -11,6 +11,7 @@ export interface Database {
           app: string | null;
           timestamp: number | null;
           user_id: string | null;
+          discount_percent: number | null;
           created_at: string | null;
           updated_at: string | null;
         };

@@ -40,7 +40,7 @@ export default async function DashboardPage({
       <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
         <section>
           <h2 className="mb-4 text-lg font-semibold text-foreground">Visão geral</h2>
-          <StatsCards totalTrips={stats.totalTrips} totalUsers={stats.totalUsers} lastTripAt={stats.lastTripAt} />
+          <StatsCards totalTrips={stats.totalTrips} totalUsers={stats.totalUsers} lastTripAt={stats.lastTripAt} isUniqueTrips={stats.isUniqueTrips} />
         </section>
 
         <section>

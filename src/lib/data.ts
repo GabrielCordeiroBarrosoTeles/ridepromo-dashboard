@@ -1,7 +1,8 @@
 import { createSupabaseClient } from "./supabase";
 import type { TripRow } from "@/types/dashboard";
 
-const DESCONTO_PERCENT = 0.2;
+/** Fallback para viagens antigas sem discount_percent (ex.: 20%). */
+const DESCONTO_FALLBACK = 0.2;
 
 /** Extrai valor numérico de strings como "R$ 12,34", "R$ 1.234,56", "12.34". */
 function parsePrice(s: string | null | undefined): number | null {
@@ -27,7 +28,7 @@ export async function fetchTripRows(limit = PAGE_SIZE_DEFAULT, offset = 0): Prom
 
     const { data: trips, error: eTrips, count } = await supabase
       .from("trips")
-      .select("id, origin, destination, app, user_id, created_at", { count: "exact" })
+      .select("id, origin, destination, app, user_id, created_at, discount_percent", { count: "exact" })
       .order("id", { ascending: false })
       .range(from, to);
 
@@ -42,7 +43,7 @@ export async function fetchTripRows(limit = PAGE_SIZE_DEFAULT, offset = 0): Prom
     const userIds = [...new Set(trips.map((t) => t.user_id).filter(Boolean))] as string[];
 
     const [resOptions, resUsers] = await Promise.all([
-      supabase.from("ride_options").select("trip_id, value, price").in("trip_id", tripIds),
+      supabase.from("ride_options").select("trip_id, type, name, price, value, estimated_time").in("trip_id", tripIds),
       userIds.length ? supabase.from("users").select("id_user, name_user, phone").in("id_user", userIds) : { data: [] as { id_user: string; name_user: string | null; phone: string | null }[] },
     ]);
 
@@ -59,8 +60,17 @@ export async function fetchTripRows(limit = PAGE_SIZE_DEFAULT, offset = 0): Prom
         const p = parsePrice(o.price);
         return p != null ? [p] : [];
       });
+      // Valor mínimo entre as opções (Pop, Moto, etc.) para exibir "Valor no app"
       const valorApp = values.length ? Math.min(...values) : 0;
-      const valorComDesconto = valorApp * (1 - DESCONTO_PERCENT);
+      const pct = t.discount_percent != null && Number.isFinite(Number(t.discount_percent)) ? Number(t.discount_percent) : DESCONTO_FALLBACK;
+      const valorComDesconto = valorApp * (1 - pct);
+      const rides = tripOptions.map((o) => ({
+        type: o.type ?? null,
+        name: o.name ?? null,
+        price: o.price ?? null,
+        value: o.value != null && Number.isFinite(Number(o.value)) ? Number(o.value) : null,
+        estimatedTime: o.estimated_time ?? null,
+      }));
 
       return {
         id: t.id,
@@ -71,7 +81,9 @@ export async function fetchTripRows(limit = PAGE_SIZE_DEFAULT, offset = 0): Prom
         app: t.app,
         valorApp,
         valorComDesconto,
+        discountPercent: t.discount_percent != null && Number.isFinite(Number(t.discount_percent)) ? Math.round(Number(t.discount_percent) * 100) : null,
         createdAt: t.created_at,
+        rides,
       };
     });
     return { rows, total };
@@ -83,9 +95,64 @@ export async function fetchTripRows(limit = PAGE_SIZE_DEFAULT, offset = 0): Prom
 
 export const TRIPS_PAGE_SIZE = PAGE_SIZE_DEFAULT;
 
-export async function fetchStats(): Promise<{ totalTrips: number; totalUsers: number; lastTripAt: string | null }> {
+export interface ClienteRow {
+  id_user: string;
+  name_user: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+/** Lista usuários que têm ao menos uma viagem com login (user_id em trips). */
+export async function fetchClientes(): Promise<ClienteRow[]> {
   try {
     const supabase = createSupabaseClient();
+    const { data: trips, error: eTrips } = await supabase
+      .from("trips")
+      .select("user_id")
+      .not("user_id", "is", null);
+    if (eTrips || !trips?.length) return [];
+    const ids = [...new Set(trips.map((r) => r.user_id).filter(Boolean))] as string[];
+    if (ids.length === 0) return [];
+
+    const { data: users, error: eUsers } = await supabase
+      .from("users")
+      .select("id_user, name_user, phone, email")
+      .in("id_user", ids)
+      .order("name_user", { ascending: true, nullsFirst: false });
+
+    if (eUsers) {
+      console.error("[fetchClientes] users:", eUsers.message);
+      return [];
+    }
+    return (users ?? []) as ClienteRow[];
+  } catch (e) {
+    console.error("[fetchClientes]", e);
+    return [];
+  }
+}
+
+export async function fetchStats(): Promise<{
+  totalTrips: number;
+  totalUsers: number;
+  lastTripAt: string | null;
+  isUniqueTrips: boolean;
+}> {
+  try {
+    const supabase = createSupabaseClient();
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_dashboard_stats");
+    if (!rpcError && rpcData && typeof rpcData === "object") {
+      const d = rpcData as { unique_trips?: number; total_users?: number; last_trip_at?: string | null };
+      return {
+        totalTrips: Number(d.unique_trips) || 0,
+        totalUsers: Number(d.total_users) || 0,
+        lastTripAt: d.last_trip_at ?? null,
+        isUniqueTrips: true,
+      };
+    }
+    if (rpcError) {
+      console.warn("[fetchStats] get_dashboard_stats não encontrada ou erro. Rode scripts/supabase_get_dashboard_stats.sql no Supabase. Fallback: count em trips.");
+    }
+
     const [rCount, rLast, rUsers] = await Promise.all([
       supabase.from("trips").select("id", { count: "exact", head: true }),
       supabase.from("trips").select("created_at").order("id", { ascending: false }).limit(1),
@@ -101,9 +168,9 @@ export async function fetchStats(): Promise<{ totalTrips: number; totalUsers: nu
     const uniq = new Set((rUsers.data ?? []).map((r) => r.user_id));
     const totalUsers = uniq.size;
 
-    return { totalTrips, totalUsers, lastTripAt };
+    return { totalTrips, totalUsers, lastTripAt, isUniqueTrips: false };
   } catch (e) {
     console.error("[fetchStats]", e);
-    return { totalTrips: 0, totalUsers: 0, lastTripAt: null };
+    return { totalTrips: 0, totalUsers: 0, lastTripAt: null, isUniqueTrips: false };
   }
 }
