@@ -17,20 +17,26 @@ function parsePrice(s: string | null | undefined): number | null {
   return Number(combined) || null;
 }
 
-export async function fetchTripRows(limit = 100): Promise<TripRow[]> {
+const PAGE_SIZE_DEFAULT = 20;
+
+export async function fetchTripRows(limit = PAGE_SIZE_DEFAULT, offset = 0): Promise<{ rows: TripRow[]; total: number }> {
   try {
     const supabase = createSupabaseClient();
-    const { data: trips, error: eTrips } = await supabase
+    const from = offset;
+    const to = offset + limit - 1;
+
+    const { data: trips, error: eTrips, count } = await supabase
       .from("trips")
-      .select("id, origin, destination, app, user_id, created_at")
+      .select("id, origin, destination, app, user_id, created_at", { count: "exact" })
       .order("id", { ascending: false })
-      .limit(limit);
+      .range(from, to);
 
     if (eTrips) {
       console.error("[fetchTripRows] Supabase trips:", eTrips.message, eTrips.code, eTrips.details);
-      return [];
+      return { rows: [], total: 0 };
     }
-    if (!trips?.length) return [];
+    const total = typeof count === "number" ? count : 0;
+    if (!trips?.length) return { rows: [], total };
 
     const tripIds = trips.map((t) => t.id);
     const userIds = [...new Set(trips.map((t) => t.user_id).filter(Boolean))] as string[];
@@ -44,7 +50,7 @@ export async function fetchTripRows(limit = 100): Promise<TripRow[]> {
     const users = (resUsers.data ?? []) as { id_user: string; name_user: string | null; phone: string | null }[];
     const userMap = new Map(users.map((u) => [u.id_user, u]));
 
-    return trips.map((t) => {
+    const rows = trips.map((t) => {
       const user = t.user_id ? userMap.get(t.user_id) : null;
       const tripOptions = options.filter((o) => String(o.trip_id) === String(t.id));
       const values = tripOptions.flatMap((o) => {
@@ -68,11 +74,14 @@ export async function fetchTripRows(limit = 100): Promise<TripRow[]> {
         createdAt: t.created_at,
       };
     });
+    return { rows, total };
   } catch (e) {
     console.error("[fetchTripRows]", e);
-    return [];
+    return { rows: [], total: 0 };
   }
 }
+
+export const TRIPS_PAGE_SIZE = PAGE_SIZE_DEFAULT;
 
 export async function fetchStats(): Promise<{ totalTrips: number; totalUsers: number; lastTripAt: string | null }> {
   try {

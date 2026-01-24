@@ -1,14 +1,32 @@
-import { fetchStats, fetchTripRows } from "@/lib/data";
+import { redirect } from "next/navigation";
+import { fetchStats, fetchTripRows, TRIPS_PAGE_SIZE } from "@/lib/data";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { TripsTable } from "@/components/dashboard/trips-table";
+import { TripsPagination } from "@/components/dashboard/trips-pagination";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function DashboardPage() {
-  const [stats, rows] = await Promise.all([fetchStats(), fetchTripRows(100)]);
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: { page?: string | string[] };
+}) {
+  const p = searchParams?.page;
+  const pageParam = Array.isArray(p) ? p[0] : p;
+  const page = Math.max(1, parseInt(String(pageParam || "1"), 10) || 1);
+  const offset = (page - 1) * TRIPS_PAGE_SIZE;
+
+  const [stats, { rows, total }] = await Promise.all([
+    fetchStats(),
+    fetchTripRows(TRIPS_PAGE_SIZE, offset),
+  ]);
+
+  const totalPages = total === 0 ? 1 : Math.ceil(total / TRIPS_PAGE_SIZE);
+  if (page > totalPages && total > 0) redirect(`/?page=${totalPages}`);
+  const currentPage = total === 0 ? 1 : Math.min(page, totalPages);
 
   return (
     <main className="min-h-screen bg-[#f5f5f5]">
@@ -33,6 +51,12 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <TripsTable rows={rows} />
+              <TripsPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                total={total}
+                pageSize={TRIPS_PAGE_SIZE}
+              />
             </CardContent>
           </Card>
         </section>

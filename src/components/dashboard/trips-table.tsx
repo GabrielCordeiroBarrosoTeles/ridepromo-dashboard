@@ -26,7 +26,11 @@ export function TripsTable({ rows }: TripsTableProps) {
         {rows.length === 0 ? (
           <TableRow>
             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-              Nenhuma viagem encontrada.
+              <span className="block">Nenhuma viagem encontrada.</span>
+              <span className="mt-1 block text-xs">
+                Os dados vêm do Supabase (trips, ride_options, users). Se esperava ver viagens, acesse{" "}
+                <a href="/api/supabase-status" className="underline">/api/supabase-status</a> para conferir a conexão.
+              </span>
             </TableCell>
           </TableRow>
         ) : (
@@ -34,8 +38,8 @@ export function TripsTable({ rows }: TripsTableProps) {
             <TableRow key={r.id}>
               <TableCell className="font-medium">{r.name}</TableCell>
               <TableCell className="hidden max-w-[200px] truncate sm:table-cell">
-                <span className="block truncate" title={`${r.origin ?? ""} → ${r.destination ?? ""}`}>
-                  {r.origin ?? "—"} → {r.destination ?? "—"}
+                <span className="block truncate" title={`${r.origin?.trim() || ""} → ${r.destination?.trim() || ""}`}>
+                  {r.origin?.trim() || "—"} → {r.destination?.trim() || "—"}
                 </span>
               </TableCell>
               <TableCell>{formatBRL(r.valorApp)}</TableCell>
