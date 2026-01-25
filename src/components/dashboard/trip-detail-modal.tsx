@@ -11,13 +11,20 @@ import {
   Bike,
   DollarSign,
   MessageCircle,
+  Gauge,
+  Route,
+  Clock,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
-import { formatBRL, whatsappUrl } from "@/lib/utils";
-import type { TripRow } from "@/types/dashboard";
+import { formatBRL, formatDateTimeBR, whatsappUrl } from "@/lib/utils";
+import type { TripRow, RideOptionRow } from "@/types/dashboard";
+import type { DriverRateConfigRow } from "@/lib/data";
 
 interface TripDetailModalProps {
   row: TripRow | null;
   onClose: () => void;
+  driverRateConfig?: DriverRateConfigRow;
 }
 
 function useModalEffects(isOpen: boolean, onClose: () => void) {
@@ -36,28 +43,110 @@ function useModalEffects(isOpen: boolean, onClose: () => void) {
   }, [isOpen, onClose]);
 }
 
-function formatDateTime(s: string | null): string {
-  if (!s) return "—";
-  try {
-    return new Date(s).toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
-
 function rideIcon(name: string | null) {
   const n = (name ?? "").toLowerCase();
   if (n.includes("moto")) return <Bike className="h-4 w-4 text-[#2d682a]" />;
   return <Car className="h-4 w-4 text-[#fd6c13]" />;
 }
 
-export function TripDetailModal({ row, onClose }: TripDetailModalProps) {
+function hasDriverRateInfo(r: RideOptionRow): boolean {
+  return (
+    r.driverValuePerKm != null ||
+    r.driverValuePerHour != null ||
+    r.pickupKm != null ||
+    r.tripKm != null ||
+    r.totalKm != null ||
+    r.pickupMin != null ||
+    r.tripDurationMin != null ||
+    r.totalMin != null ||
+    r.meetsMinPerKm != null ||
+    r.meetsMinPerHour != null
+  );
+}
+
+function isMotoRide(r: RideOptionRow): boolean {
+  const n = ((r.name ?? "") + " " + (r.type ?? "")).toLowerCase();
+  return n.includes("moto");
+}
+
+function RideDriverRateBlock({ r, driverRateConfig }: { r: RideOptionRow; driverRateConfig?: DriverRateConfigRow }) {
+  if (!hasDriverRateInfo(r)) return null;
+  const isMoto = isMotoRide(r);
+  const minPerKm = driverRateConfig ? (isMoto ? driverRateConfig.minPerKmMoto : driverRateConfig.minPerKmCar) : null;
+  const minPerHour = driverRateConfig ? (isMoto ? driverRateConfig.minPerHourMoto : driverRateConfig.minPerHourCar) : null;
+  return (
+    <div className="mt-3 rounded-lg border border-gray-100 bg-white/80 p-3 text-xs">
+      <p className="mb-2 flex items-center gap-1.5 font-medium uppercase tracking-wider text-gray-500">
+        <Gauge className="h-3.5 w-3.5" />
+        Taxa do motorista
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {(r.driverValuePerKm != null || r.driverValuePerHour != null) && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {r.driverValuePerKm != null && (
+              <span><strong className="text-gray-600">R$/km:</strong> {formatBRL(r.driverValuePerKm)}</span>
+            )}
+            {r.driverValuePerHour != null && (
+              <span><strong className="text-gray-600">R$/h:</strong> {formatBRL(r.driverValuePerHour)}</span>
+            )}
+          </div>
+        )}
+        {(r.pickupKm != null || r.tripKm != null || r.totalKm != null) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Route className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <span>
+              {r.pickupKm != null && <span>busca {r.pickupKm.toFixed(2)} km</span>}
+              {r.pickupKm != null && (r.tripKm != null || r.totalKm != null) && " · "}
+              {r.tripKm != null && <span>corrida {r.tripKm.toFixed(2)} km</span>}
+              {r.tripKm != null && r.totalKm != null && " · "}
+              {r.totalKm != null && <span>total {r.totalKm.toFixed(2)} km</span>}
+            </span>
+          </div>
+        )}
+        {(r.pickupMin != null || r.tripDurationMin != null || r.totalMin != null) && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <span>
+              {r.pickupMin != null && <span>busca {r.pickupMin} min</span>}
+              {r.pickupMin != null && (r.tripDurationMin != null || r.totalMin != null) && " · "}
+              {r.tripDurationMin != null && <span>corrida {r.tripDurationMin} min</span>}
+              {r.tripDurationMin != null && r.totalMin != null && " · "}
+              {r.totalMin != null && <span>total {r.totalMin} min</span>}
+            </span>
+          </div>
+        )}
+        {(r.meetsMinPerKm != null || r.meetsMinPerHour != null) && (
+          <div className="flex flex-wrap gap-2">
+            {r.meetsMinPerKm != null && (
+              r.meetsMinPerKm ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                  <CheckCircle2 className="h-3 w-3" /> Atende mín. R$/km{minPerKm != null ? ` (${formatBRL(minPerKm)})` : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                  <XCircle className="h-3 w-3" /> Abaixo mín. R$/km{minPerKm != null ? ` (mín. ${formatBRL(minPerKm)})` : ""}
+                </span>
+              )
+            )}
+            {r.meetsMinPerHour != null && (
+              r.meetsMinPerHour ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                  <CheckCircle2 className="h-3 w-3" /> Atende mín. R$/h{minPerHour != null ? ` (${formatBRL(minPerHour)})` : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                  <XCircle className="h-3 w-3" /> Abaixo mín. R$/h{minPerHour != null ? ` (mín. ${formatBRL(minPerHour)})` : ""}
+                </span>
+              )
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function TripDetailModal({ row, onClose, driverRateConfig }: TripDetailModalProps) {
   useModalEffects(!!row, onClose);
   if (!row) return null;
 
@@ -142,7 +231,7 @@ export function TripDetailModal({ row, onClose }: TripDetailModalProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Data e hora</p>
-              <p className="mt-1 text-sm font-medium text-gray-900">{formatDateTime(createdAt)}</p>
+              <p className="mt-1 text-sm font-medium text-gray-900">{formatDateTimeBR(createdAt)}</p>
             </div>
           </section>
 
@@ -179,20 +268,23 @@ export function TripDetailModal({ row, onClose }: TripDetailModalProps) {
                 {rides.map((r, i) => (
                   <li
                     key={i}
-                    className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/30 px-4 py-3 transition hover:border-gray-200 hover:bg-gray-50/60"
+                    className="rounded-xl border border-gray-100 bg-gray-50/30 px-4 py-3 transition hover:border-gray-200 hover:bg-gray-50/60"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
-                      {rideIcon(r.name)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900">{r.name || r.type || "—"}</p>
-                      {r.estimatedTime && (
-                        <p className="text-xs text-gray-500">{r.estimatedTime}</p>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+                        {rideIcon(r.name)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900">{r.name || r.type || "—"}</p>
+                        {r.estimatedTime && (
+                          <p className="text-xs text-gray-500">{r.estimatedTime}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">{r.price || (r.value != null ? formatBRL(r.value) : "—")}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">{r.price || (r.value != null ? formatBRL(r.value) : "—")}</p>
-                    </div>
+                    <RideDriverRateBlock r={r} driverRateConfig={driverRateConfig} />
                   </li>
                 ))}
               </ul>

@@ -1,39 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchClientes } from "@/lib/data";
+import { useSearchParams } from "next/navigation";
+import { fetchTripRows, fetchDriverRateConfig, TRIPS_PAGE_SIZE } from "@/lib/data";
+import { TripsTableWithFilters } from "@/components/dashboard/trips-table-with-filters";
+import { TripsPagination } from "@/components/dashboard/trips-pagination";
+import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshButton } from "@/components/dashboard/refresh-button";
-import { ClientesTableWithFilters } from "@/components/dashboard/clientes-table-with-filters";
 import { ProtectedRoute } from "@/hooks/useAuth";
+import { ViagensPageData } from "@/types";
 
-import { ClienteRow } from "@/types";
-
-export default function ClientesPage() {
-  const [clientes, setClientes] = useState<ClienteRow[]>([]);
+export default function ViagensPage() {
+  const [data, setData] = useState<ViagensPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const offset = (currentPage - 1) * TRIPS_PAGE_SIZE;
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setError(null);
-        const data = await fetchClientes();
-        if (!data || !Array.isArray(data)) {
-          throw new Error("Dados inválidos recebidos do servidor");
-        }
-        setClientes(data);
+        const [tripData, driverConfig] = await Promise.all([
+          fetchTripRows(TRIPS_PAGE_SIZE, offset),
+          fetchDriverRateConfig(),
+        ]);
+        setData({ tripData, driverConfig });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao carregar dados dos clientes";
-        console.error("Erro ao carregar clientes:", error);
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao carregar dados";
+        console.error("Erro ao carregar dados:", error);
         setError(errorMessage);
       } finally {
         setLoading(false);
       }
     };
+
     loadData();
-  }, []);
+  }, [offset]);
 
   if (loading) {
     return (
@@ -69,14 +74,24 @@ export default function ClientesPage() {
 
         <div className="mx-auto max-w-6xl space-y-4 overflow-x-hidden p-3 sm:space-y-6 sm:p-4 md:p-6">
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Clientes (com login)</h2>
             <Card>
               <CardHeader>
-                <CardTitle>Usuários</CardTitle>
-                <CardDescription>Usuários que fizeram ao menos uma viagem com login no app.</CardDescription>
+                <CardTitle>Viagens</CardTitle>
+                <CardDescription>Nome, valor do app, valor com desconto e link para WhatsApp do cliente.</CardDescription>
               </CardHeader>
               <CardContent>
-                <ClientesTableWithFilters clientes={clientes} />
+                {data && (
+                  <>
+                    <TripsTableWithFilters rows={data.tripData.rows} driverRateConfig={data.driverConfig} />
+                    <TripsPagination
+                      currentPage={currentPage}
+                      totalPages={Math.ceil(data.tripData.total / TRIPS_PAGE_SIZE)}
+                      total={data.tripData.total}
+                      pageSize={TRIPS_PAGE_SIZE}
+                      basePath="/viagens"
+                    />
+                  </>
+                )}
               </CardContent>
             </Card>
           </section>

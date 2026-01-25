@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchClientes } from "@/lib/data";
+import { fetchDesistencias } from "@/lib/data";
 import { SiteHeader } from "@/components/site-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
-import { ClientesTableWithFilters } from "@/components/dashboard/clientes-table-with-filters";
+import { DesistenciasTableWithModal } from "@/components/dashboard/desistencias-table-with-modal";
 import { ProtectedRoute } from "@/hooks/useAuth";
 
-import { ClienteRow } from "@/types";
+import { OptOutRow } from "@/types";
 
-export default function ClientesPage() {
-  const [clientes, setClientes] = useState<ClienteRow[]>([]);
+export default function DesistenciasPage() {
+  const [rows, setRows] = useState<OptOutRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,14 +18,11 @@ export default function ClientesPage() {
     const loadData = async () => {
       try {
         setError(null);
-        const data = await fetchClientes();
-        if (!data || !Array.isArray(data)) {
-          throw new Error("Dados inválidos recebidos do servidor");
-        }
-        setClientes(data);
+        const data = await fetchDesistencias(200);
+        setRows(data);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao carregar dados dos clientes";
-        console.error("Erro ao carregar clientes:", error);
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao carregar desistências";
+        console.error("Erro ao carregar desistências:", error);
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -63,22 +59,20 @@ export default function ClientesPage() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5f5f5]">
-        <SiteHeader variant="dashboard">
-          <RefreshButton />
-        </SiteHeader>
+        <SiteHeader variant="dashboard" />
 
         <div className="mx-auto max-w-6xl space-y-4 overflow-x-hidden p-3 sm:space-y-6 sm:p-4 md:p-6">
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Clientes (com login)</h2>
-            <Card>
-              <CardHeader>
-                <CardTitle>Usuários</CardTitle>
-                <CardDescription>Usuários que fizeram ao menos uma viagem com login no app.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ClientesTableWithFilters clientes={clientes} />
-              </CardContent>
-            </Card>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Desistências</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Nome do cliente, modelo do celular e viagem vinculada. Clique em uma linha com viagem para ver os detalhes.
+                </p>
+              </div>
+              <RefreshButton />
+            </div>
+            <DesistenciasTableWithModal rows={rows} />
           </section>
         </div>
       </main>

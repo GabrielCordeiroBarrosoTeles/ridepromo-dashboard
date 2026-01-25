@@ -7,12 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatBRL, whatsappUrl } from "@/lib/utils";
 import { TripDetailModal } from "./trip-detail-modal";
 import type { TripRow } from "@/types/dashboard";
+import type { DriverRateConfigRow } from "@/lib/data";
 
 interface TripsTableProps {
   rows: TripRow[];
+  driverRateConfig?: DriverRateConfigRow;
 }
 
-export function TripsTable({ rows }: TripsTableProps) {
+export function TripsTable({ rows, driverRateConfig }: TripsTableProps) {
   const [detailRow, setDetailRow] = useState<TripRow | null>(null);
 
   return (
@@ -22,6 +24,7 @@ export function TripsTable({ rows }: TripsTableProps) {
           <TableRow>
             <TableHead>Nome</TableHead>
             <TableHead className="hidden sm:table-cell">Origem / Destino</TableHead>
+            <TableHead className="w-[90px]">App</TableHead>
             <TableHead>Valor app</TableHead>
             <TableHead>Valor c/ desconto</TableHead>
             <TableHead className="w-[100px]">WhatsApp</TableHead>
@@ -31,7 +34,7 @@ export function TripsTable({ rows }: TripsTableProps) {
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                 <span className="block">Nenhuma viagem encontrada.</span>
                 <span className="mt-1 block text-xs">
                   Os dados vêm do Supabase (trips, ride_options, users). Se esperava ver viagens, acesse{" "}
@@ -48,6 +51,7 @@ export function TripsTable({ rows }: TripsTableProps) {
                     {r.origin?.trim() || "—"} → {r.destination?.trim() || "—"}
                   </span>
                 </TableCell>
+                <TableCell className="font-medium">{r.app?.trim() || "—"}</TableCell>
                 <TableCell>{formatBRL(r.valorApp)}</TableCell>
                 <TableCell className="text-app-green font-medium">{formatBRL(r.valorComDesconto)}</TableCell>
                 <TableCell>
@@ -79,7 +83,7 @@ export function TripsTable({ rows }: TripsTableProps) {
         </TableBody>
       </Table>
 
-      <TripDetailModal row={detailRow} onClose={() => setDetailRow(null)} />
+      <TripDetailModal row={detailRow} onClose={() => setDetailRow(null)} driverRateConfig={driverRateConfig} />
     </>
   );
 }

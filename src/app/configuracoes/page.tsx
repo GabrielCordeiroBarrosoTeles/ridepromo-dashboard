@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchClientes } from "@/lib/data";
+import { fetchConfigs } from "@/lib/data";
 import { SiteHeader } from "@/components/site-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshButton } from "@/components/dashboard/refresh-button";
-import { ClientesTableWithFilters } from "@/components/dashboard/clientes-table-with-filters";
+import { ConfigsTableWithModal } from "@/components/dashboard/configs-table-with-modal";
 import { ProtectedRoute } from "@/hooks/useAuth";
+import { ConfigRow } from "@/types";
 
-import { ClienteRow } from "@/types";
-
-export default function ClientesPage() {
-  const [clientes, setClientes] = useState<ClienteRow[]>([]);
+export default function ConfiguracoesPage() {
+  const [configs, setConfigs] = useState<ConfigRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,15 +17,12 @@ export default function ClientesPage() {
     const loadData = async () => {
       try {
         setError(null);
-        const data = await fetchClientes();
-        if (!data || !Array.isArray(data)) {
-          throw new Error("Dados inválidos recebidos do servidor");
-        }
-        setClientes(data);
+        const data = await fetchConfigs();
+        setConfigs(data);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao carregar dados dos clientes";
-        console.error("Erro ao carregar clientes:", error);
-        setError(errorMessage);
+        const message = error instanceof Error ? error.message : "Erro desconhecido ao carregar configurações";
+        console.error("Erro ao carregar configurações:", error);
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -63,20 +58,20 @@ export default function ClientesPage() {
   return (
     <ProtectedRoute>
       <main className="min-h-screen bg-[#f5f5f5]">
-        <SiteHeader variant="dashboard">
-          <RefreshButton />
-        </SiteHeader>
+        <SiteHeader variant="dashboard" />
 
         <div className="mx-auto max-w-6xl space-y-4 overflow-x-hidden p-3 sm:space-y-6 sm:p-4 md:p-6">
           <section>
-            <h2 className="mb-4 text-lg font-semibold text-foreground">Clientes (com login)</h2>
+            <h2 className="mb-4 text-lg font-semibold text-foreground">Configurações</h2>
             <Card>
               <CardHeader>
-                <CardTitle>Usuários</CardTitle>
-                <CardDescription>Usuários que fizeram ao menos uma viagem com login no app.</CardDescription>
+                <CardTitle>Configurações do app</CardTitle>
+                <CardDescription>
+                  Todas as chaves da tabela config (Supabase). Clique em uma linha para ver mais informações no modal.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <ClientesTableWithFilters clientes={clientes} />
+                <ConfigsTableWithModal configs={configs} />
               </CardContent>
             </Card>
           </section>

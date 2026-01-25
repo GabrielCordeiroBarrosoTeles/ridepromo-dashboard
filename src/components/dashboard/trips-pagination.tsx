@@ -9,11 +9,15 @@ interface TripsPaginationProps {
   totalPages: number;
   total: number;
   pageSize: number;
+  /** Base path for page links (e.g. "/viagens"). If not set, relative "?" is used. */
+  basePath?: string;
 }
 
-export function TripsPagination({ currentPage, totalPages, total, pageSize }: TripsPaginationProps) {
+export function TripsPagination({ currentPage, totalPages, total, pageSize, basePath = "" }: TripsPaginationProps) {
   const from = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const to = Math.min(currentPage * pageSize, total);
+  const prevHref = currentPage === 2 ? (basePath || "?page=1") : `${basePath ? basePath + "?" : "?"}page=${currentPage - 1}`;
+  const nextHref = `${basePath ? basePath + (basePath.includes("?") ? "&" : "?") : "?"}page=${currentPage + 1}`;
 
   return (
     <div className="flex flex-col items-center gap-3 border-t pt-4 sm:flex-row sm:justify-between">
@@ -23,7 +27,7 @@ export function TripsPagination({ currentPage, totalPages, total, pageSize }: Tr
       <div className="flex items-center gap-2">
         {currentPage > 1 ? (
           <Button variant="outline" size="sm" asChild>
-            <Link href={currentPage === 2 ? "/" : `?page=${currentPage - 1}`}>
+            <Link href={prevHref}>
               <ChevronLeft className="h-4 w-4" />
               Anterior
             </Link>
@@ -39,7 +43,7 @@ export function TripsPagination({ currentPage, totalPages, total, pageSize }: Tr
         </span>
         {currentPage < totalPages ? (
           <Button variant="outline" size="sm" asChild>
-            <Link href={`?page=${currentPage + 1}`}>
+            <Link href={nextHref}>
               Próximo
               <ChevronRight className="h-4 w-4" />
             </Link>

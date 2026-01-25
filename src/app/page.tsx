@@ -1,66 +1,135 @@
-import { redirect } from "next/navigation";
-import { fetchStats, fetchTripRows, TRIPS_PAGE_SIZE } from "@/lib/data";
-import { StatsCards } from "@/components/dashboard/stats-cards";
-import { TripsTable } from "@/components/dashboard/trips-table";
-import { TripsPagination } from "@/components/dashboard/trips-pagination";
-import { RefreshButton } from "@/components/dashboard/refresh-button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { SiteHeader } from "@/components/site-header";
+import { LoginModal } from "@/components/LoginModal";
+import { CarFront, Shield, Zap, BarChart3, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams?: { page?: string | string[] };
-}) {
-  const p = searchParams?.page;
-  const pageParam = Array.isArray(p) ? p[0] : p;
-  const page = Math.max(1, parseInt(String(pageParam || "1"), 10) || 1);
-  const offset = (page - 1) * TRIPS_PAGE_SIZE;
+export default function HomePage() {
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const router = useRouter();
 
-  const [stats, { rows, total }] = await Promise.all([
-    fetchStats(),
-    fetchTripRows(TRIPS_PAGE_SIZE, offset),
-  ]);
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-  const totalPages = total === 0 ? 1 : Math.ceil(total / TRIPS_PAGE_SIZE);
-  if (page > totalPages && total > 0) redirect(`/?page=${totalPages}`);
-  const currentPage = total === 0 ? 1 : Math.min(page, totalPages);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Login failed");
+      }
+
+      setShowLoginModal(false);
+      router.push("/dashboard");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Network error occurred";
+      throw new Error(errorMessage);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f5f5f5]">
-      <header className="border-b bg-[#fd6c13] px-4 py-4 text-white shadow-sm md:px-6">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <h1 className="text-xl font-bold md:text-2xl">RidePromo</h1>
-          <RefreshButton />
-        </div>
-      </header>
+      <SiteHeader variant="landing">
+        <button
+          onClick={() => setShowLoginModal(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#fd6c13] shadow-sm transition hover:bg-white/95 hover:shadow"
+          aria-label="Acessar o painel administrativo"
+        >
+          Acessar Dashboard
+          <ArrowRight className="h-4 w-4" aria-hidden />
+        </button>
+      </SiteHeader>
 
-      <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-foreground">Visão geral</h2>
-          <StatsCards totalTrips={stats.totalTrips} totalUsers={stats.totalUsers} lastTripAt={stats.lastTripAt} isUniqueTrips={stats.isUniqueTrips} />
+      <div className="mx-auto max-w-4xl space-y-16 overflow-x-hidden px-4 py-10 sm:px-6 md:py-16">
+        {/* Hero */}
+        <section className="text-center">
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#fd6c13] text-white shadow-lg">
+            <CarFront className="h-8 w-8" aria-hidden />
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            RidePromo
+          </h1>
+          <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
+            Sugestões de preços sempre seguras para sua mobilidade urbana.
+          </p>
+          <p className="mt-2 text-base text-muted-foreground">
+            Compare preços de 99, Uber, InDriver e outras plataformas em um só lugar.
+          </p>
         </section>
 
+        {/* O que é */}
         <section>
-          <Card>
-            <CardHeader>
-              <CardTitle>Viagens</CardTitle>
-              <CardDescription>Nome, valor do app, valor com desconto e link para WhatsApp do cliente.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TripsTable rows={rows} />
-              <TripsPagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                total={total}
-                pageSize={TRIPS_PAGE_SIZE}
-              />
-            </CardContent>
-          </Card>
+          <h2 className="mb-4 text-xl font-semibold text-foreground sm:text-2xl">O que é o RidePromo?</h2>
+          <p className="text-muted-foreground leading-relaxed">
+            O RidePromo é um aplicativo que acompanha o uso de apps de mobilidade (99, Uber, InDriver etc.)
+            e exibe sugestões de preços com desconto, usando motoristas de várias plataformas mas
+            validados para sua segurança. Você vê o valor sugerido antes de confirmar a corrida e
+            pode comparar ofertas em tempo real.
+          </p>
         </section>
+
+        {/* Como funciona */}
+        <section>
+          <h2 className="mb-4 text-xl font-semibold text-foreground sm:text-2xl">Como funciona?</h2>
+          <ul className="space-y-3 text-muted-foreground">
+            <li className="flex gap-3">
+              <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#fd6c13]/15 text-[#fd6c13] font-medium">1</span>
+              <span>Você abre um app de corrida (99, Uber, InDriver…) e solicita uma viagem.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#fd6c13]/15 text-[#fd6c13] font-medium">2</span>
+              <span>O RidePromo detecta a tela de preço e mostra um modal com sugestão de valor com desconto.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#fd6c13]/15 text-[#fd6c13] font-medium">3</span>
+              <span>Você pode aceitar a sugestão e seguir para a tela “Tudo pronto” ou fechar e continuar no app original.</span>
+            </li>
+          </ul>
+        </section>
+
+        {/* Benefícios */}
+        <section>
+          <h2 className="mb-4 text-xl font-semibold text-foreground sm:text-2xl">Benefícios</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex gap-3 rounded-xl border bg-card p-4 shadow-sm">
+              <Shield className="h-6 w-6 shrink-0 text-[#fd6c13]" aria-hidden />
+              <div>
+                <h3 className="font-medium text-foreground">Segurança</h3>
+                <p className="text-sm text-muted-foreground">Motoristas validados; sugestões baseadas em valores mínimos por km/hora.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 rounded-xl border bg-card p-4 shadow-sm">
+              <Zap className="h-6 w-6 shrink-0 text-[#fd6c13]" aria-hidden />
+              <div>
+                <h3 className="font-medium text-foreground">Desconto</h3>
+                <p className="text-sm text-muted-foreground">Sugestão de preço com desconto em relação ao valor do app.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 rounded-xl border bg-card p-4 shadow-sm sm:col-span-2">
+              <BarChart3 className="h-6 w-6 shrink-0 text-[#fd6c13]" aria-hidden />
+              <div>
+                <h3 className="font-medium text-foreground">Transparência</h3>
+                <p className="text-sm text-muted-foreground">Comparação entre apps e visão do valor no app vs. valor sugerido.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
       </div>
+      
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={handleLogin}
+      />
     </main>
   );
 }
